@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fourier Polygons</title>
-<meta name="description" content="An interactive polygon built from discrete Fourier coordinates: drag the vertices or the mode coefficients.">
+<title>Polygons from Fourier data</title>
+<meta name="description" content="An interactive polygon built from discrete Fourier coordinates: drag the vertices or the Fourier coefficients.">
 <style>
 :root{
   --bg:#fbfaf8;--surface-1:#f1efea;--surface-2:#ffffff;
@@ -33,8 +33,15 @@
 body{margin:0;background:var(--bg);color:var(--text-primary);
   font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:920px;margin:0 auto;padding:28px 16px 40px}
-h1{font-size:24px;font-weight:600;margin:0 0 6px}
-p.lede{color:var(--text-secondary);margin:0 0 18px;max-width:68ch}
+h1{font-size:24px;font-weight:600;margin:0}
+.fp-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin:0 0 10px}
+.fp-head button{font-size:13px;padding:4px 10px}
+p.lede{color:var(--text-secondary);margin:0 0 14px}
+p.lede .math{white-space:nowrap}
+.fp-intro{display:grid;grid-template-rows:1fr;opacity:1;transition:grid-template-rows .45s ease,opacity .35s ease}
+.fp-intro>div{overflow:hidden;min-height:0}
+.fp-intro.closed{grid-template-rows:0fr;opacity:0}
+@media (prefers-reduced-motion: reduce){.fp-intro{transition:none}}
 .math{font-family:"Latin Modern Math","STIX Two Math","Cambria Math",Georgia,serif;font-style:italic}
 button{font:inherit;font-size:13px;padding:5px 11px;border-radius:7px;cursor:pointer;
   background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border-strong)}
@@ -42,7 +49,9 @@ button:hover{background:var(--surface-1)}
 .fp-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--text-secondary)}
 .fp-on{background:var(--accent-bg)!important;color:var(--accent-text)!important;border-color:var(--accent-border)!important}
 .fp-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
-@media (max-width:640px){.fp-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.fp-grid{grid-template-columns:minmax(0,1fr)}
+  .fp-pin{position:sticky;top:0;z-index:1;background:var(--bg);padding:4px 0;border-bottom:1px solid var(--border)}
+  .fp-pin svg.fp{width:min(100%,46vh);margin:0 auto}}
 .fp-card{background:var(--surface-1);border-radius:var(--radius);padding:10px 12px;margin-top:12px;max-width:260px}
 .fp-card b{display:block;font-weight:500;font-size:20px;color:var(--text-primary);font-variant-numeric:tabular-nums}
 .fp-card span{font-size:12px;color:var(--text-secondary)}
@@ -53,35 +62,46 @@ footer{margin-top:28px;font-size:12px;color:var(--text-muted)}
 </head>
 <body>
 <main>
-<h1>Fourier polygons</h1>
-<p class="lede">An <span class="math">N</span>-gon written in discrete Fourier coordinates:
-<span class="math">v<sub>j</sub> = ω<sup>j</sup> + Σ<sub>k=2</sub><sup>N−1</sup> z<sub>k</sub> ω<sup>jk</sup></span>,
-with <span class="math">ω = e<sup>2πi/N</sup></span>. Fixing the first mode at 1 removes translation,
-rotation and scale, so each complex coefficient <span class="math">z<sub>k</sub></span> is pure shape, and
-<span class="math">z = 0</span> is the regular polygon. Drag a vertex or a coefficient; hover a dial to see
-that mode alone.</p>
+<div class="fp-head"><h1>Polygons from Fourier data</h1><button id="introT" aria-expanded="true" aria-controls="intro">Hide introduction</button></div>
+<div class="fp-intro" id="intro"><div>
+<p class="lede">An <span class="math">N</span>-gon with vertices <span class="math">v<sub>0</sub>, …, v<sub>N−1</sub></span> expressed as complex numbers can be
+written in terms of discrete Fourier coefficients
+<span class="math">v<sub>j</sub> = V<sub>0</sub> + V<sub>1</sub>ω<sup>j</sup> + Σ<sub>k=2</sub><sup>N−1</sup> V<sub>k</sub> ω<sup>jk</sup></span>,
+where <span class="math">ω = e<sup>2πi/N</sup></span> is a primitive <span class="math">N</span>th root of unity and
+<span class="math">V<sub>0</sub>, …, V<sub>N−1</sub></span> are complex numbers, called <em>Fourier coefficients</em>.
+Adjusting <span class="math">V<sub>0</sub></span> merely translates the polygon in the plane, and multiplying each
+<span class="math">V<sub>k</sub></span> by the same complex number <span class="math">α</span> merely rotates and scales the polygon. This means
+that the underlying <em>shape</em> of the polygon can be described using just <span class="math">N</span> − 2 complex numbers
+<span class="math">z<sub>2</sub>, …, z<sub>N−1</sub></span>, where <span class="math">z<sub>k</sub> = V<sub>k</sub>/V<sub>1</sub></span>.
+The inverse discrete Fourier transform of <span class="math">[0, 1, z<sub>2</sub>, …, z<sub>N−1</sub>]</span> then gives the
+vertices of a similar polygon, balanced around the origin. When
+<span class="math">z<sub>2</sub> = ⋯ = z<sub>N−1</sub> = 0</span>, this produces the regular <span class="math">N</span>-gon.</p>
+<p class="lede">The interactive below allows you to drag the vertices around, showing how that changes the
+reduced Fourier coefficients. You can also drag the Fourier coefficients around, which changes the polygon.</p>
+</div></div>
 
 <div class="fp-row">
   <span>Sides</span><span id="ns" style="display:flex;gap:4px"></span>
-  <button id="rel" style="margin-left:10px">Relabel vertices</button><button id="reg">Regular polygon</button>
-  <label style="display:flex;align-items:center;gap:6px;margin-left:6px"><input type="checkbox" id="simp" style="margin:0">Require simplicity (no self-intersection)</label>
+  <button id="rel" style="margin-left:10px">Cycle vertices</button><button id="reg">Regular polygon</button>
+  <label style="display:flex;align-items:center;gap:6px;margin-left:6px"><input type="checkbox" id="simp" checked style="margin:0">Require simplicity (no self-intersection)</label>
 </div>
 <div class="fp-grid">
-  <div>
+  <div class="fp-pin">
     <svg class="fp" id="poly" viewBox="0 0 360 360" role="img" aria-label="Polygon with draggable vertices"></svg>
   </div>
   <div>
-    <div style="font-size:13px;color:var(--text-secondary);margin:4px 0 6px">Mode coefficients <span class="math">z<sub>k</sub></span>, drag the dots</div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:13px;color:var(--text-secondary);margin:4px 0 6px"><span>Fourier coefficients <span class="math">z<sub>k</sub></span>, drag the dots</span>
+      <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="snap" style="margin:0">Snap to the axes</label></div>
     <svg class="fp" id="disks" viewBox="0 0 300 262" role="img" aria-label="Draggable complex coefficient for each Fourier mode, with its value below"></svg>
     <div id="legend" style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-top:6px"></div>
-    <div class="fp-card"><b id="rz">0</b><span>‖z‖, distance from the regular polygon</span></div>
+    <div class="fp-card"><b id="rz">0</b><span>‖z‖, distance from the regular <span class="math">N</span>-gon</span></div>
   </div>
 </div>
 <div id="note"></div>
-<footer>Relabelling the vertices multiplies each <span class="math">z<sub>k</sub></span> by
-<span class="math">ω<sup>k−1</sup></span>: a rotation of every dial that leaves the polygon, and ‖z‖, unchanged.</footer>
 </main>
 <script>
+document.getElementById('introT').onclick=e=>{const b=e.currentTarget,box=document.getElementById('intro'),open=box.classList.toggle('closed')===false;
+  b.setAttribute('aria-expanded',open);b.textContent=open?'Hide introduction':'Show introduction';box.inert=!open};
 const TAU=2*Math.PI;
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 // The drawing is D(x) = A x + B applied to the normalized polygon (X_0 = 0, X_1 = 1). A and B are
@@ -100,7 +120,9 @@ function verts(){const v=[];for(let j=0;j<S.N;j++){let p=om(j);for(const k of mo
 // The coefficients of any polygon, and the similarity that normalizes it: v = X_1 u + X_0.
 function fromV(v){const X=k=>{let s=[0,0];v.forEach((p,j)=>{const t=mul(p,conj(om(j,k)));s=[s[0]+t[0],s[1]+t[1]]});return [s[0]/S.N,s[1]/S.N]};const x1=X(1);if(abs(x1)<1e-3)return null;const z={};for(const k of modes())z[k]=div(X(k),x1);return {z,x0:X(0),x1}}
 const D=p=>{const t=mul(S.A,p);return [t[0]+S.B[0],t[1]+S.B[1]]};
-function settle(){S.anim=null;S.A=[1,0];S.B=[0,0];S.fit=null}
+function settle(){S.anim=null;S.zShow=null;S.A=[1,0];S.B=[0,0];S.fit=null}
+// Stop a transition where it is, keeping the drawing as it stands.
+function halt(){S.anim=null;S.zShow=null}
 function setN(n){settle();S.N=n;S.z={};for(const k of modes())S.z[k]=[0,0];S.sel=0;S.raw=null;S.arcs=null;S.note='';S.zr=1}
 // Simple = counterclockwise with positive area, no zero-length edge, no edge folding back on its
 // neighbour, and no two non-adjacent edges touching (crossing, meeting at a point, or overlapping).
@@ -118,10 +140,35 @@ function simple(v){const n=v.length;let A=0;
   for(let i=0;i<n;i++)for(let j=i+2;j<n;j++){if(i===0&&j===n-1)continue;if(touch(v[i],v[(i+1)%n],v[j],v[(j+1)%n]))return false}
   return true}
 const lerp=(a,b,t)=>[a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])];
-// The largest t in [0, 1] found by bisection with ok(t) true, given ok(0): how far along a move
-// the polygon stays simple. Drags are small steps, so this holds a vertex or dial at the boundary.
-function reach(ok){if(ok(1))return 1;let lo=0,hi=1;for(let i=0;i<40;i++){const m=(lo+hi)/2;if(ok(m))lo=m;else hi=m}return lo}
-const HELD='Held at the edge of the simple polygons: further would make two edges touch.';
+// How far along a straight move the polygon stays simple ALL the way. at(t) gives the vertices,
+// which move along straight lines in t for every move here (one vertex dragged, one coefficient
+// dragged, or all coefficients scaled), so every orientation test of the simplicity check is a
+// quadratic in t, and simplicity can only change where one of them is zero. Checking the polygon
+// at each root and between consecutive roots therefore finds the first bad point however thin the
+// bad region is; the last good point before it comes from bisection. (Checking only the end of the
+// move let a held knob or vertex jump to any simple endpoint once the pointer had gone round the
+// bad region, as if the way there had been simple.) ok(t) may test more than simplicity; n extra
+// evenly spaced checks cover whatever else it tests.
+function crossQ(p,q,r){const e0=sub(q[0],p[0]),e1=sub(q[1],p[1]),f0=sub(r[0],p[0]),f1=sub(r[1],p[1]);
+  return [cross(e1,f1),cross(e0,f1)+cross(e1,f0),cross(e0,f0)]}
+function rootsIn01(q,out){const [a,b,c]=q,e=1e-14;
+  if(Math.abs(a)<e){if(Math.abs(b)>e)out.push(-c/b);return}
+  const d=b*b-4*a*c;if(d<0)return;const s=Math.sqrt(d);out.push((-b-s)/(2*a),(-b+s)/(2*a))}
+function reach(at,ok,n){const V0=at(0),V1=at(1),P=V0.map((p,j)=>[p,sub(V1[j],p)]),N=P.length,R=[];
+  const A=[0,0,0];
+  for(let i=0;i<N;i++){const a=P[i],b=P[(i+1)%N],c=P[(i+2)%N];
+    rootsIn01(crossQ(b,a,c),R);                                    // an edge folding onto the next
+    const q=crossQ([[0,0],[0,0]],a,b);A[0]+=q[0];A[1]+=q[1];A[2]+=q[2]}   // signed area
+  rootsIn01(A,R);
+  for(let i=0;i<N;i++)for(let j=i+2;j<N;j++){if(i===0&&j===N-1)continue;
+    const a=P[i],b=P[(i+1)%N],c=P[j],d=P[(j+1)%N];
+    for(const q of [crossQ(a,b,c),crossQ(a,b,d),crossQ(c,d,a),crossQ(c,d,b)])rootsIn01(q,R)}
+  const ts=[...new Set(R.filter(t=>t>0&&t<1))].sort((x,y)=>x-y),pts=[];let prev=0;
+  for(const t of ts.concat([1])){pts.push((prev+t)/2,t);prev=t}
+  n=Math.max(1,Math.ceil(n||0));for(let i=1;i<n;i++)pts.push(i/n);pts.sort((x,y)=>x-y);
+  let lo=0;for(const t of pts){if(!ok(t)){let hi=t;for(let b=0;b<40;b++){const m=(lo+hi)/2;if(ok(m))lo=m;else hi=m}return lo}lo=t}
+  return 1}
+const HELD='Held at a simple polygon: further would cause self-intersection.';
 const znorm=()=>Math.sqrt(modes().reduce((s,k)=>s+S.z[k][0]**2+S.z[k][1]**2,0));
 function shape(){return S.raw||verts().map(D)}
 const ref=()=>{const g=[];for(let j=0;j<S.N;j++)g.push(D(om(j)));return g};
@@ -144,50 +191,67 @@ v.forEach((p,j)=>{const c=pt(p,f),d=sub(p,cen),m=abs(d)||1,lx=c[0]+17*d[0]/m,ly=
 $('poly').innerHTML=h;renderDisks(BLUE,CORAL);readouts(BLUE,CORAL)}
 const CELL=100,RD=38,ROWH=130;
 function dpos(i){const c=i%3,r=Math.floor(i/3);return [50+c*CELL,46+r*ROWH]}
-function renderDisks(BLUE,CORAL){if(!S.drag||S.drag.t!=='z'){let m=0;for(const k of modes())m=Math.max(m,abs(S.z[k]));S.zr=Math.max(1,m*1.15)}let h='';modes().forEach((k,i)=>{const [x,y]=dpos(i),z=S.z[k],sc=RD/S.zr,px=x+z[0]*sc,py=y-z[1]*sc;const hot=S.hover===k;h+=`<circle cx="${x}" cy="${y}" r="${RD}" fill="${hot?CORAL:'var(--surface-1)'}" fill-opacity="${hot?0.1:1}" stroke="var(--border-strong)" stroke-width="0.7"/><line x1="${x-RD}" y1="${y}" x2="${x+RD}" y2="${y}" stroke="var(--border)" stroke-width="0.7"/><line x1="${x}" y1="${y-RD}" x2="${x}" y2="${y+RD}" stroke="var(--border)" stroke-width="0.7"/>`;
-if(S.arcs&&S.arcs[k]&&abs(S.arcs[k])>1e-6){const o=S.arcs[k],ox=x+o[0]*sc,oy=y-o[1]*sc,rr=abs(o)*sc,ang=(k-1)*TAU/S.N;h+=`<path d="M${fm(ox)} ${fm(oy)}A${fm(rr)} ${fm(rr)} 0 ${ang>Math.PI?1:0} 0 ${fm(px)} ${fm(py)}" fill="none" stroke="${CORAL}" stroke-width="1" stroke-dasharray="3 3"/>`}
+// Relabelling turns z_k by (k-1) 2 pi / N; the short way round, in (-pi, pi].
+const turnOf=k=>{let f=((k-1)/S.N)%1;if(f>0.5)f-=1;return f*TAU};
+const dialRange=()=>{let m=0;for(const k of modes())m=Math.max(m,abs(S.z[k]));return Math.max(1,m*1.15)};
+function renderDisks(BLUE,CORAL){const ZS=S.zShow||S.z;if(!S.anim&&(!S.drag||S.drag.t!=='z'))S.zr=dialRange();let h='';modes().forEach((k,i)=>{const sn=S.snapped&&S.snapped.k===k?S.snapped:null,[x,y]=dpos(i),z=ZS[k],sc=RD/S.zr,px=x+z[0]*sc,py=y-z[1]*sc;const hot=S.hover===k;h+=`<circle cx="${x}" cy="${y}" r="${RD}" fill="${hot?CORAL:'var(--surface-1)'}" fill-opacity="${hot?0.1:1}" stroke="var(--border-strong)" stroke-width="0.7"/><line x1="${x-RD}" y1="${y}" x2="${x+RD}" y2="${y}" stroke="${sn&&sn.re?CORAL:'var(--border)'}" stroke-width="${sn&&sn.re?1.4:0.7}"/><line x1="${x}" y1="${y-RD}" x2="${x}" y2="${y+RD}" stroke="${sn&&sn.im?CORAL:'var(--border)'}" stroke-width="${sn&&sn.im?1.4:0.7}"/>`;
+if(S.arcs&&S.arcs[k]&&abs(S.arcs[k])>1e-6){const o=S.arcs[k],ox=x+o[0]*sc,oy=y-o[1]*sc,rr=abs(o)*sc,ang=turnOf(k);h+=`<path d="M${fm(ox)} ${fm(oy)}A${fm(rr)} ${fm(rr)} 0 0 ${ang>0?0:1} ${fm(px)} ${fm(py)}" fill="none" stroke="${CORAL}" stroke-width="1" stroke-dasharray="3 3"/>`}
 h+=`<line x1="${x}" y1="${y}" x2="${fm(px)}" y2="${fm(py)}" stroke="${BLUE}" stroke-width="1.3"/><circle cx="${fm(px)}" cy="${fm(py)}" r="6" fill="${BLUE}" stroke="var(--surface-2)" stroke-width="1.5" style="cursor:grab"/><text x="${x}" y="${y+RD+13}" text-anchor="middle" dominant-baseline="central" style="font-size:12px;fill:var(--text-secondary)">k = ${k}</text><text x="${x}" y="${y+RD+30}" text-anchor="middle" dominant-baseline="central" style="font-size:12px;fill:var(--text-primary);font-variant-numeric:tabular-nums">${cfmt(z)}</text>`});
 const rows=Math.ceil((S.N-2)/3);$('disks').setAttribute('viewBox',`0 0 300 ${rows*ROWH+2}`);$('disks').innerHTML=h}
 function readouts(BLUE,CORAL){$('rz').textContent=znorm().toFixed(3);$('note').textContent=S.note;
-$('legend').innerHTML=`<span style="color:${CORAL}">Chain</span>: how the selected vertex adds up from ω<sup>j</sup> and each mode. Dashed polygon: z = 0. <span style="color:${css('--red')}">Red</span>: the polygon crosses or touches itself.`;
+$('legend').innerHTML=`<span style="color:${CORAL}">Chain</span>: how the selected vertex adds up from ω<sup>j</sup> and each coefficient. Gray dashed regular polygon: all z<sub>k</sub> = 0. <span style="color:${CORAL}">Orange dashed polygon</span> (on hover/drag): the effect of z<sub>k</sub> alone on the regular N-gon. <span style="color:${css('--red')}">Red</span>: the polygon has self-intersection. When all z<sub>k</sub> are real, the polygon is mirror-symmetric across the horizontal axis.`;
 document.querySelectorAll('#ns button').forEach(b=>b.classList.toggle('fp-on',+b.dataset.n===S.N))}
-function evt(svg,e){const r=svg.getBoundingClientRect(),vb=svg.viewBox.baseVal;return [(e.clientX-r.left)*vb.width/r.width,(e.clientY-r.top)*vb.height/r.height]}
+function evt(svg,e){const M=svg.getScreenCTM().inverse(),p=new DOMPoint(e.clientX,e.clientY).matrixTransform(M);return [p.x,p.y]}
 const poly=$('poly'),disks=$('disks');
-poly.addEventListener('pointerdown',e=>{const m=evt(poly,e),v=shape();let best=-1,bd=18;v.forEach((p,j)=>{const c=pt(p,S.fit),d=Math.hypot(c[0]-m[0],c[1]-m[1]);if(d<bd){bd=d;best=j}});if(best<0)return;S.anim=null;S.sel=best;S.arcs=null;S.note='';S.raw=v.map(p=>p.slice());S.drag={t:'v',j:best};poly.setPointerCapture(e.pointerId);render()});
+poly.addEventListener('pointerdown',e=>{const m=evt(poly,e),v=shape();let best=-1,bd=e.pointerType==='mouse'?18:32;v.forEach((p,j)=>{const c=pt(p,S.fit),d=Math.hypot(c[0]-m[0],c[1]-m[1]);if(d<bd){bd=d;best=j}});if(best<0)return;S.anim=null;S.sel=best;S.arcs=null;S.note='';S.raw=v.map(p=>p.slice());S.drag={t:'v',j:best};poly.setPointerCapture(e.pointerId);render()});
 poly.addEventListener('pointermove',e=>{if(!S.drag||S.drag.t!=='v')return;const m=evt(poly,e),f=S.fit,w=[f.cx+(m[0]-180)/f.s,f.cy-(m[1]-180)/f.s];
-if($('simp').checked){const j=S.drag.j,prev=S.raw[j],at=t=>{const r=S.raw.slice();r[j]=lerp(prev,w,t);return r},t=reach(t=>{const r=at(t);return simple(r)&&fromV(r)!==null});
+if($('simp').checked){const j=S.drag.j,prev=S.raw[j],at=t=>{const r=S.raw.slice();r[j]=lerp(prev,w,t);return r},t=reach(at,t=>{const r=at(t);return simple(r)&&fromV(r)!==null},abs(sub(w,prev))*f.s);
   S.raw[j]=at(t)[j];S.note=t<1?HELD:''}else S.raw[S.drag.j]=w;
 const d=fromV(S.raw);if(d){S.z=d.z;S.A=d.x1;S.B=d.x0}render()});
 const endV=()=>{if(S.drag&&S.drag.t==='v'){S.drag=null;S.raw=null;ease()}};
-// After a vertex drag, ease the drawing from where the pointer left it to the normalized polygon:
-// the scale and rotation of A geometrically, B and the view linearly, 0.4 s.
-function ease(){if(matchMedia('(prefers-reduced-motion: reduce)').matches){settle();render();return}
-  const A0=S.A,B0=S.B,F0=S.fit;S.A=[1,0];S.B=[0,0];const F1=fit(verts());S.A=A0;S.B=B0;
+// After a vertex or knob drag, ease the drawing from where the pointer left it to the normalized
+// polygon: the scale and rotation of A and the dials' range geometrically, B and the view
+// linearly, 0.4 s. After a knob drag A and B are already 1 and 0, so only the view and dials move.
+// With `zTo`, the coefficients also travel there in a straight line (Regular polygon, and the
+// simplicity toggle). With `dials` = {from, turn}, only the dials move: each z_k from `from[k]`,
+// turning by `turn(k)` radians (Relabel vertices, where the polygon itself only turns rigidly).
+function ease(zTo,dials){if(matchMedia('(prefers-reduced-motion: reduce)').matches){if(zTo)S.z=zTo;settle();render();return}
+  const A0=S.A,B0=S.B,F0=S.fit,Z0=S.zr,zFrom={};for(const k of modes())zFrom[k]=S.z[k].slice();
+  if(zTo)S.z=zTo;const Z1=dialRange();S.A=[1,0];S.B=[0,0];const F1=fit(verts());S.A=A0;S.B=B0;S.z=zFrom;
   const lr=Math.log(abs(A0)),th=Math.atan2(A0[1],A0[0]),t0=performance.now(),run={};S.anim=run;
   const step=now=>{if(S.anim!==run)return;const t=Math.min(1,(now-t0)/400),e=t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,u=1-e;
     S.A=[Math.exp(u*lr)*Math.cos(u*th),Math.exp(u*lr)*Math.sin(u*th)];S.B=[u*B0[0],u*B0[1]];
-    S.fit={cx:F0.cx+e*(F1.cx-F0.cx),cy:F0.cy+e*(F1.cy-F0.cy),s:F0.s*Math.pow(F1.s/F0.s,e)};
-    if(t<1){render();requestAnimationFrame(step)}else{settle();render()}};
+    if(zTo){const z={};for(const k of modes())z[k]=lerp(zFrom[k],zTo[k],e);S.z=z}
+    if(dials){const z={};for(const k of modes()){const a=dials.turn(k)*e;z[k]=mul(dials.from[k],[Math.cos(a),Math.sin(a)])}S.zShow=z}
+    S.fit={cx:F0.cx+e*(F1.cx-F0.cx),cy:F0.cy+e*(F1.cy-F0.cy),s:F0.s*Math.pow(F1.s/F0.s,e)};S.zr=Z0*Math.pow(Z1/Z0,e);
+    if(t<1){render();requestAnimationFrame(step)}else{if(zTo)S.z=zTo;settle();render()}};
   requestAnimationFrame(step)}
 poly.addEventListener('pointerup',endV);poly.addEventListener('pointercancel',endV);
 function dhit(m){let hit=null;modes().forEach((k,i)=>{const [x,y]=dpos(i);if(Math.hypot(m[0]-x,m[1]-y)<=RD+6)hit=k});return hit}
+// Snapping: a knob within SNAP dial units (of RD = 38) of the real or imaginary axis sits on it,
+// and near both at once, at 0. S.snapped says which, so the axis can be lit while dragging.
+const SNAP=3.5;
 function setZ(k,m){const i=modes().indexOf(k),[x,y]=dpos(i),sc=RD/S.zr;let zx=(m[0]-x)/sc,zy=-(m[1]-y)/sc;const a=Math.hypot(zx,zy);if(a>S.zr){zx*=S.zr/a;zy*=S.zr/a}
-if($('simp').checked){const old=S.z[k],c=[zx,zy],t=reach(t=>{S.z[k]=lerp(old,c,t);return simple(verts())});S.z[k]=lerp(old,c,t);S.note=t<1?HELD:''}
+S.snapped=null;if($('snap').checked){const re=Math.abs(zy*sc)<SNAP,im=Math.abs(zx*sc)<SNAP;if(re)zy=0;if(im)zx=0;if(re||im)S.snapped={k,re,im}}
+if($('simp').checked){const old=S.z[k],c=[zx,zy],at=t=>{S.z[k]=lerp(old,c,t);return verts()},t=reach(at,t=>simple(at(t)));S.z[k]=lerp(old,c,t);S.note=t<1?HELD:''}
 else S.z[k]=[zx,zy]}
-disks.addEventListener('pointerdown',e=>{const m=evt(disks,e),k=dhit(m);if(k==null)return;settle();S.drag={t:'z',k};S.hover=k;S.arcs=null;S.note='';disks.setPointerCapture(e.pointerId);setZ(k,m);render()});
+disks.addEventListener('pointerdown',e=>{const m=evt(disks,e),k=dhit(m);if(k==null)return;S.anim=null;S.drag={t:'z',k};S.hover=k;S.arcs=null;S.note='';disks.setPointerCapture(e.pointerId);setZ(k,m);render()});
 disks.addEventListener('pointermove',e=>{const m=evt(disks,e);if(S.drag&&S.drag.t==='z'){setZ(S.drag.k,m);render();return}const k=dhit(m);if(k!==S.hover){S.hover=k;render()}});
-const endZ=()=>{if(S.drag&&S.drag.t==='z'){S.drag=null;render()}};
+const endZ=e=>{if(S.drag&&S.drag.t==='z'){S.drag=null;S.snapped=null;if(e.pointerType!=='mouse')S.hover=null;ease()}};
 disks.addEventListener('pointerup',endZ);disks.addEventListener('pointercancel',endZ);
 disks.addEventListener('pointerleave',()=>{if(!S.drag&&S.hover!=null){S.hover=null;render()}});
 [3,4,5,6,7,8].forEach(n=>{const b=document.createElement('button');b.textContent=n;b.dataset.n=n;b.style.minWidth='34px';b.onclick=()=>{setN(n);render()};$('ns').appendChild(b)});
-$('reg').onclick=()=>{setN(S.N);render()};
+$('reg').onclick=()=>{S.sel=0;S.arcs=null;S.note='';const z={};for(const k of modes())z[k]=[0,0];ease(z)};
 // Turning the constraint on at a non-simple polygon shrinks every coefficient toward z = 0, the
 // regular polygon, until it is simple again.
-$('simp').onchange=()=>{settle();if(!$('simp').checked||simple(verts())){S.note='';render();return}
+$('simp').onchange=()=>{halt();if(!$('simp').checked||simple(verts())){S.note='';render();return}
   const z0={};for(const k of modes())z0[k]=S.z[k].slice();
-  const set=t=>{for(const k of modes())S.z[k]=[t*z0[k][0],t*z0[k][1]]},t=reach(t=>{set(t);return simple(verts())});
-  set(0.98*t);S.arcs=null;S.note=`It crossed itself: every coefficient scaled by ${(0.98*t).toFixed(2)} toward the regular polygon to make it simple.`;render()};
-$('rel').onclick=()=>{settle();const z0=znorm();S.arcs={};for(const k of modes()){S.arcs[k]=S.z[k].slice();S.z[k]=mul(S.z[k],om(1,k-1))}S.sel=(S.sel+S.N-1)%S.N;S.note=`Same polygon, new labels (drawn turned by one step, since mode 1 is pinned to ω^j): each dial rotated by ω^(k−1), and ‖z‖ stays ${z0.toFixed(3)}.`;render()};
+  const set=t=>{for(const k of modes())S.z[k]=[t*z0[k][0],t*z0[k][1]]},t=reach(t=>{set(t);return verts()},t=>{set(t);return simple(verts())});
+  set(0.98*t);const zT=S.z;S.z=z0;S.arcs=null;S.note='Made simple by scaling every coefficient toward the regular N-gon.';ease(zT)};
+// Relabelling: the new coefficients take effect at once, drawn through A·ω so the picture does not
+// move; then A eases back to 1, a rigid turn by one step, while each dial sweeps its arc.
+$('rel').onclick=()=>{halt();const z0=znorm(),from={};S.arcs={};for(const k of modes()){from[k]=S.z[k].slice();S.arcs[k]=S.z[k].slice();S.z[k]=mul(S.z[k],om(1,k-1))}S.sel=(S.sel+S.N-1)%S.N;S.A=mul(S.A,om(1));S.note='Same polygon, with the vertices relabeled. Each dial is rotated by ωᵏ⁻¹.';
+  ease(null,{from,turn:turnOf})};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
 setN(6);S.z[2]=[0.18,0.1];S.z[3]=[-0.1,0.14];S.z[5]=[0.12,-0.08];render();
 </script>
