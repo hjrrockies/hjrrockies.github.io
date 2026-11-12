@@ -64,6 +64,7 @@ that mode alone.</p>
 <div class="fp-row">
   <span>Sides</span><span id="ns" style="display:flex;gap:4px"></span>
   <button id="rel" style="margin-left:10px">Relabel vertices</button><button id="reg">Regular polygon</button>
+  <label style="display:flex;align-items:center;gap:6px;margin-left:6px"><input type="checkbox" id="simp" style="margin:0">Keep it simple</label>
 </div>
 <div class="fp-grid">
   <div>
@@ -95,6 +96,26 @@ const modes=()=>{const a=[];for(let k=2;k<S.N;k++)a.push(k);return a};
 function verts(){const v=[];for(let j=0;j<S.N;j++){let p=om(j);for(const k of modes()){const t=mul(S.z[k],om(j,k));p=[p[0]+t[0],p[1]+t[1]]}v.push(p)}return v}
 function fromV(v){const X=k=>{let s=[0,0];v.forEach((p,j)=>{const t=mul(p,conj(om(j,k)));s=[s[0]+t[0],s[1]+t[1]]});return [s[0]/S.N,s[1]/S.N]};const x1=X(1);if(abs(x1)<1e-3)return null;const z={};for(const k of modes())z[k]=div(X(k),x1);return z}
 function setN(n){S.N=n;S.z={};for(const k of modes())S.z[k]=[0,0];S.sel=0;S.raw=null;S.arcs=null;S.note='';S.zr=1}
+// Simple = counterclockwise with positive area, no zero-length edge, no edge folding back on its
+// neighbour, and no two non-adjacent edges touching (crossing, meeting at a point, or overlapping).
+const cross=(a,b)=>a[0]*b[1]-a[1]*b[0];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1];
+function onSeg(p,a,b){return Math.min(a[0],b[0])-1e-12<=p[0]&&p[0]<=Math.max(a[0],b[0])+1e-12&&Math.min(a[1],b[1])-1e-12<=p[1]&&p[1]<=Math.max(a[1],b[1])+1e-12}
+function touch(a,b,c,d){const o1=cross(sub(b,a),sub(c,a)),o2=cross(sub(b,a),sub(d,a)),o3=cross(sub(d,c),sub(a,c)),o4=cross(sub(d,c),sub(b,c)),e=1e-12;
+  if(((o1>e&&o2<-e)||(o1<-e&&o2>e))&&((o3>e&&o4<-e)||(o3<-e&&o4>e)))return true;
+  return (Math.abs(o1)<=e&&onSeg(c,a,b))||(Math.abs(o2)<=e&&onSeg(d,a,b))||(Math.abs(o3)<=e&&onSeg(a,c,d))||(Math.abs(o4)<=e&&onSeg(b,c,d))}
+function simple(v){const n=v.length;let A=0;
+  for(let i=0;i<n;i++){const a=v[i],b=v[(i+1)%n],c=v[(i+2)%n];A+=cross(a,b);
+    if(abs(sub(b,a))<1e-9)return false;
+    if(Math.abs(cross(sub(a,b),sub(c,b)))<1e-12&&dot(sub(a,b),sub(c,b))>0)return false}
+  if(A<=1e-12)return false;
+  for(let i=0;i<n;i++)for(let j=i+2;j<n;j++){if(i===0&&j===n-1)continue;if(touch(v[i],v[(i+1)%n],v[j],v[(j+1)%n]))return false}
+  return true}
+const lerp=(a,b,t)=>[a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])];
+// The largest t in [0, 1] found by bisection with ok(t) true, given ok(0): how far along a move
+// the polygon stays simple. Drags are small steps, so this holds a vertex or dial at the boundary.
+function reach(ok){if(ok(1))return 1;let lo=0,hi=1;for(let i=0;i<40;i++){const m=(lo+hi)/2;if(ok(m))lo=m;else hi=m}return lo}
+const HELD='Held at the edge of the simple polygons: further would make two edges touch.';
 const znorm=()=>Math.sqrt(modes().reduce((s,k)=>s+S.z[k][0]**2+S.z[k][1]**2,0));
 function shape(){return S.raw||verts()}
 function fit(v){const all=v.slice();for(let j=0;j<S.N;j++)all.push(om(j));const xs=all.map(p=>p[0]),ys=all.map(p=>p[1]);const cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2,h=Math.max(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))/2*1.32+0.06;return {cx,cy,s:180/h}}
@@ -125,11 +146,16 @@ document.querySelectorAll('#ns button').forEach(b=>b.classList.toggle('fp-on',+b
 function evt(svg,e){const r=svg.getBoundingClientRect(),vb=svg.viewBox.baseVal;return [(e.clientX-r.left)*vb.width/r.width,(e.clientY-r.top)*vb.height/r.height]}
 const poly=$('poly'),disks=$('disks');
 poly.addEventListener('pointerdown',e=>{const m=evt(poly,e),v=shape();let best=-1,bd=18;v.forEach((p,j)=>{const c=pt(p,S.fit),d=Math.hypot(c[0]-m[0],c[1]-m[1]);if(d<bd){bd=d;best=j}});if(best<0)return;S.sel=best;S.arcs=null;S.note='';S.raw=v.map(p=>p.slice());S.drag={t:'v',j:best};poly.setPointerCapture(e.pointerId);render()});
-poly.addEventListener('pointermove',e=>{if(!S.drag||S.drag.t!=='v')return;const m=evt(poly,e),f=S.fit,w=[f.cx+(m[0]-180)/f.s,f.cy-(m[1]-180)/f.s];S.raw[S.drag.j]=w;const z=fromV(S.raw);if(z){S.z=z}render()});
+poly.addEventListener('pointermove',e=>{if(!S.drag||S.drag.t!=='v')return;const m=evt(poly,e),f=S.fit,w=[f.cx+(m[0]-180)/f.s,f.cy-(m[1]-180)/f.s];
+if($('simp').checked){const j=S.drag.j,prev=S.raw[j],at=t=>{const r=S.raw.slice();r[j]=lerp(prev,w,t);return r},t=reach(t=>{const r=at(t);return simple(r)&&fromV(r)!==null});
+  S.raw[j]=at(t)[j];S.note=t<1?HELD:''}else S.raw[S.drag.j]=w;
+const z=fromV(S.raw);if(z){S.z=z}render()});
 const endV=()=>{if(S.drag&&S.drag.t==='v'){S.drag=null;S.raw=null;render()}};
 poly.addEventListener('pointerup',endV);poly.addEventListener('pointercancel',endV);
 function dhit(m){let hit=null;modes().forEach((k,i)=>{const [x,y]=dpos(i);if(Math.hypot(m[0]-x,m[1]-y)<=RD+6)hit=k});return hit}
-function setZ(k,m){const i=modes().indexOf(k),[x,y]=dpos(i),sc=RD/S.zr;let zx=(m[0]-x)/sc,zy=-(m[1]-y)/sc;const a=Math.hypot(zx,zy);if(a>S.zr){zx*=S.zr/a;zy*=S.zr/a}S.z[k]=[zx,zy]}
+function setZ(k,m){const i=modes().indexOf(k),[x,y]=dpos(i),sc=RD/S.zr;let zx=(m[0]-x)/sc,zy=-(m[1]-y)/sc;const a=Math.hypot(zx,zy);if(a>S.zr){zx*=S.zr/a;zy*=S.zr/a}
+if($('simp').checked){const old=S.z[k],c=[zx,zy],t=reach(t=>{S.z[k]=lerp(old,c,t);return simple(verts())});S.z[k]=lerp(old,c,t);S.note=t<1?HELD:''}
+else S.z[k]=[zx,zy]}
 disks.addEventListener('pointerdown',e=>{const m=evt(disks,e),k=dhit(m);if(k==null)return;S.drag={t:'z',k};S.hover=k;S.arcs=null;S.note='';disks.setPointerCapture(e.pointerId);setZ(k,m);render()});
 disks.addEventListener('pointermove',e=>{const m=evt(disks,e);if(S.drag&&S.drag.t==='z'){setZ(S.drag.k,m);render();return}const k=dhit(m);if(k!==S.hover){S.hover=k;render()}});
 const endZ=()=>{if(S.drag&&S.drag.t==='z'){S.drag=null;render()}};
@@ -137,6 +163,12 @@ disks.addEventListener('pointerup',endZ);disks.addEventListener('pointercancel',
 disks.addEventListener('pointerleave',()=>{if(!S.drag&&S.hover!=null){S.hover=null;render()}});
 [3,4,5,6,7,8].forEach(n=>{const b=document.createElement('button');b.textContent=n;b.dataset.n=n;b.style.minWidth='34px';b.onclick=()=>{setN(n);render()};$('ns').appendChild(b)});
 $('reg').onclick=()=>{setN(S.N);render()};
+// Turning the constraint on at a non-simple polygon shrinks every coefficient toward z = 0, the
+// regular polygon, until it is simple again.
+$('simp').onchange=()=>{if(!$('simp').checked||simple(verts())){S.note='';render();return}
+  const z0={};for(const k of modes())z0[k]=S.z[k].slice();
+  const set=t=>{for(const k of modes())S.z[k]=[t*z0[k][0],t*z0[k][1]]},t=reach(t=>{set(t);return simple(verts())});
+  set(0.98*t);S.arcs=null;S.note=`It crossed itself: every coefficient scaled by ${(0.98*t).toFixed(2)} toward the regular polygon to make it simple.`;render()};
 $('rel').onclick=()=>{const z0=znorm();S.arcs={};for(const k of modes()){S.arcs[k]=S.z[k].slice();S.z[k]=mul(S.z[k],om(1,k-1))}S.sel=(S.sel+S.N-1)%S.N;S.note=`Same polygon, new labels (drawn turned by one step, since mode 1 is pinned to ω^j): each dial rotated by ω^(k−1), and ‖z‖ stays ${z0.toFixed(3)}.`;render()};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
 setN(6);S.z[2]=[0.18,0.1];S.z[3]=[-0.1,0.14];S.z[5]=[0.12,-0.08];render();
