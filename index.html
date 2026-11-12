@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hayden Ringer</title>
+<style>
+:root{--bg:#fbfaf8;--text-primary:#1f1e1c;--text-secondary:#5c5a55;--border:#e2dfd8;--link:#1d5fa8}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#1a1a19;--text-primary:#ecebe7;--text-secondary:#b3b0a8;--border:#34332f;--link:#9cc6f2}
+}
+:root[data-theme="dark"]{--bg:#1a1a19;--text-primary:#ecebe7;--text-secondary:#b3b0a8;--border:#34332f;--link:#9cc6f2}
+body{margin:0;background:var(--bg);color:var(--text-primary);
+  font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:680px;margin:0 auto;padding:40px 16px}
+h1{font-size:26px;font-weight:600;margin:0 0 24px}
+h2{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin:0 0 8px}
+ul{list-style:none;padding:0;margin:0}
+li{padding:12px 0;border-top:1px solid var(--border)}
+a{color:var(--link);text-decoration:none;font-weight:500}
+a:hover{text-decoration:underline}
+li p{margin:2px 0 0;color:var(--text-secondary);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>Hayden Ringer</h1>
+<h2>Interactives</h2>
+<ul>
+  <li><a href="fourier-polygon/">Fourier polygons</a>
+    <p>Build a polygon from discrete Fourier coordinates: drag the vertices or the mode coefficients.</p></li>
+</ul>
+</main>
+</body>
+</html>

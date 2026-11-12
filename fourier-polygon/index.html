@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fourier Polygons</title>
+<meta name="description" content="An interactive polygon built from discrete Fourier coordinates: drag the vertices or the mode coefficients.">
+<style>
+:root{
+  --bg:#fbfaf8;--surface-1:#f1efea;--surface-2:#ffffff;
+  --text-primary:#1f1e1c;--text-secondary:#5c5a55;--text-muted:#9a978f;
+  --border:#e2dfd8;--border-strong:#c9c5bc;
+  --accent-bg:#e3eefa;--accent-text:#1d5fa8;--accent-border:#8fb7e3;
+  --blue:#378ADD;--coral:#D85A30;--radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1a1a19;--surface-1:#262624;--surface-2:#1a1a19;
+    --text-primary:#ecebe7;--text-secondary:#b3b0a8;--text-muted:#6f6c66;
+    --border:#34332f;--border-strong:#4a4843;
+    --accent-bg:#1f3550;--accent-text:#9cc6f2;--accent-border:#3c6a9c;
+    --blue:#5aa2ea;--coral:#e8774f;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1a1a19;--surface-1:#262624;--surface-2:#1a1a19;
+  --text-primary:#ecebe7;--text-secondary:#b3b0a8;--text-muted:#6f6c66;
+  --border:#34332f;--border-strong:#4a4843;
+  --accent-bg:#1f3550;--accent-text:#9cc6f2;--accent-border:#3c6a9c;
+  --blue:#5aa2ea;--coral:#e8774f;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text-primary);
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:28px 16px 40px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}
+p.lede{color:var(--text-secondary);margin:0 0 18px;max-width:68ch}
+.math{font-family:"Latin Modern Math","STIX Two Math","Cambria Math",Georgia,serif;font-style:italic}
+button{font:inherit;font-size:13px;padding:5px 11px;border-radius:7px;cursor:pointer;
+  background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border-strong)}
+button:hover{background:var(--surface-1)}
+.fp-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--text-secondary)}
+.fp-on{background:var(--accent-bg)!important;color:var(--accent-text)!important;border-color:var(--accent-border)!important}
+.fp-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:640px){.fp-grid{grid-template-columns:minmax(0,1fr)}}
+.fp-card{background:var(--surface-1);border-radius:var(--radius);padding:10px 12px;margin-top:12px;max-width:260px}
+.fp-card b{display:block;font-weight:500;font-size:20px;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.fp-card span{font-size:12px;color:var(--text-secondary)}
+svg.fp{width:100%;display:block;touch-action:none;user-select:none}
+#note{font-size:13px;color:var(--text-secondary);margin-top:10px;min-height:20px}
+footer{margin-top:28px;font-size:12px;color:var(--text-muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Fourier polygons</h1>
+<p class="lede">An <span class="math">N</span>-gon written in discrete Fourier coordinates:
+<span class="math">v<sub>j</sub> = ω<sup>j</sup> + Σ<sub>k=2</sub><sup>N−1</sup> z<sub>k</sub> ω<sup>jk</sup></span>,
+with <span class="math">ω = e<sup>2πi/N</sup></span>. Fixing the first mode at 1 removes translation,
+rotation and scale, so each complex coefficient <span class="math">z<sub>k</sub></span> is pure shape, and
+<span class="math">z = 0</span> is the regular polygon. Drag a vertex or a coefficient; hover a dial to see
+that mode alone.</p>
+
+<div class="fp-row">
+  <span>Sides</span><span id="ns" style="display:flex;gap:4px"></span>
+  <button id="rel" style="margin-left:10px">Relabel vertices</button><button id="reg">Regular polygon</button>
+  <label style="display:flex;align-items:center;gap:6px;margin-left:6px"><input type="checkbox" id="reach" checked style="margin:0">Reachable vertex moves</label>
+</div>
+<div class="fp-grid">
+  <div>
+    <svg class="fp" id="poly" viewBox="0 0 360 360" role="img" aria-label="Polygon with draggable vertices"></svg>
+  </div>
+  <div>
+    <div style="font-size:13px;color:var(--text-secondary);margin:4px 0 6px">Mode coefficients <span class="math">z<sub>k</sub></span>, drag the dots</div>
+    <svg class="fp" id="disks" viewBox="0 0 300 262" role="img" aria-label="Draggable complex coefficient for each Fourier mode, with its value below"></svg>
+    <div id="legend" style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-top:6px"></div>
+    <div class="fp-card"><b id="rz">0</b><span>‖z‖, distance from the regular polygon</span></div>
+  </div>
+</div>
+<div id="note"></div>
+<footer>Relabelling the vertices multiplies each <span class="math">z<sub>k</sub></span> by
+<span class="math">ω<sup>k−1</sup></span>: a rotation of every dial that leaves the polygon, and ‖z‖, unchanged.</footer>
+</main>
+<script>
+const TAU=2*Math.PI,R0=0.11;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const S={N:6,z:{},sel:0,drag:null,hover:null,raw:null,arcs:null,fit:null,zr:1,note:''};
+const $=id=>document.getElementById(id);
+const mul=(a,b)=>[a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0]];
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1]];
+const abs=a=>Math.hypot(a[0],a[1]);
+const conj=a=>[a[0],-a[1]];
+const div=(a,b)=>{const d=b[0]*b[0]+b[1]*b[1];const m=mul(a,conj(b));return [m[0]/d,m[1]/d]};
+const om=(j,k=1)=>{const t=TAU*j*k/S.N;return [Math.cos(t),Math.sin(t)]};
+const modes=()=>{const a=[];for(let k=2;k<S.N;k++)a.push(k);return a};
+function verts(){const v=[];for(let j=0;j<S.N;j++){let p=om(j);for(const k of modes()){const t=mul(S.z[k],om(j,k));p=[p[0]+t[0],p[1]+t[1]]}v.push(p)}return v}
+function fromV(v){const X=k=>{let s=[0,0];v.forEach((p,j)=>{const t=mul(p,conj(om(j,k)));s=[s[0]+t[0],s[1]+t[1]]});return [s[0]/S.N,s[1]/S.N]};const x1=X(1);if(abs(x1)<1e-3)return null;const z={};for(const k of modes())z[k]=div(X(k),x1);return z}
+function setN(n){S.N=n;S.z={};for(const k of modes())S.z[k]=[0,0];S.sel=0;S.raw=null;S.arcs=null;S.note='';S.zr=1}
+const znorm=()=>Math.sqrt(modes().reduce((s,k)=>s+S.z[k][0]**2+S.z[k][1]**2,0));
+function shape(){return S.raw||verts()}
+function fit(v){const all=v.slice();for(let j=0;j<S.N;j++)all.push(om(j));const xs=all.map(p=>p[0]),ys=all.map(p=>p[1]);const cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2,h=Math.max(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))/2*1.32+0.06;return {cx,cy,s:180/h}}
+const pt=(p,f)=>[180+f.s*(p[0]-f.cx),180-f.s*(p[1]-f.cy)];
+const fm=x=>x.toFixed(1);
+function cfmt(z){const c=x=>Math.abs(x)<0.005?0:x;const re=c(z[0]),im=c(z[1]);return `${re<0?'−':''}${Math.abs(re).toFixed(2)} ${im<0?'−':'+'} ${Math.abs(im).toFixed(2)}i`}
+function render(){
+const BLUE=css('--blue'),CORAL=css('--coral');
+const v=shape();if(!S.drag||!S.fit)S.fit=fit(v);const f=S.fit,n=S.N;let h='';
+const P=a=>a.map(p=>pt(p,f).map(fm).join(',')).join(' ');
+h+=`<polygon points="${P(v)}" fill="${BLUE}" fill-opacity="0.13" stroke="none"/>`;
+const g=[];for(let j=0;j<n;j++)g.push(om(j));h+=`<polygon points="${P(g)}" fill="none" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 4"/>`;
+if(S.hover!=null){const m=[];for(let j=0;j<n;j++){const t=mul(S.z[S.hover],om(j,S.hover)),b=om(j);m.push([b[0]+t[0],b[1]+t[1]])}h+=`<polygon points="${P(m)}" fill="none" stroke="${CORAL}" stroke-width="1.2" stroke-dasharray="6 3"/>`}
+h+=`<polygon points="${P(v)}" fill="none" stroke="${BLUE}" stroke-width="2" stroke-linejoin="round"/>`;
+const r=R0*f.s;
+if($('reach').checked){for(const p of v){const c=pt(p,f);h+=`<circle cx="${fm(c[0])}" cy="${fm(c[1])}" r="${fm(r)}" fill="${BLUE}" fill-opacity="0.08" stroke="${BLUE}" stroke-width="0.7"/>`}}
+if(!S.raw){let a=[0,0],b=om(S.sel);const ch=[[0,0],b];a=b;for(const k of modes()){const t=mul(S.z[k],om(S.sel,k));a=[a[0]+t[0],a[1]+t[1]];ch.push(a)}h+=`<polyline points="${P(ch)}" fill="none" stroke="${CORAL}" stroke-width="1.6" stroke-linejoin="round"/>`;ch.forEach(p=>{const c=pt(p,f);h+=`<circle cx="${fm(c[0])}" cy="${fm(c[1])}" r="2.2" fill="${CORAL}"/>`})}
+const cen=v.reduce((s,p)=>[s[0]+p[0]/n,s[1]+p[1]/n],[0,0]);
+v.forEach((p,j)=>{const c=pt(p,f),d=sub(p,cen),m=abs(d)||1,lx=c[0]+17*d[0]/m,ly=c[1]-17*d[1]/m;h+=`<circle cx="${fm(c[0])}" cy="${fm(c[1])}" r="${j===S.sel?7:5.5}" fill="${j===S.sel?CORAL:BLUE}" stroke="var(--surface-2)" stroke-width="1.5" style="cursor:grab"/><text x="${fm(Math.min(350,Math.max(10,lx)))}" y="${fm(Math.min(352,Math.max(12,ly)))}" text-anchor="middle" dominant-baseline="central" style="font-size:12px;fill:var(--text-secondary)">${j}</text>`});
+$('poly').innerHTML=h;renderDisks(BLUE,CORAL);readouts(BLUE,CORAL)}
+const CELL=100,RD=38,ROWH=130;
+function dpos(i){const c=i%3,r=Math.floor(i/3);return [50+c*CELL,46+r*ROWH]}
+function renderDisks(BLUE,CORAL){if(!S.drag||S.drag.t!=='z'){let m=0;for(const k of modes())m=Math.max(m,abs(S.z[k]));S.zr=Math.max(1,m*1.15)}let h='';modes().forEach((k,i)=>{const [x,y]=dpos(i),z=S.z[k],sc=RD/S.zr,px=x+z[0]*sc,py=y-z[1]*sc;const hot=S.hover===k;h+=`<circle cx="${x}" cy="${y}" r="${RD}" fill="${hot?CORAL:'var(--surface-1)'}" fill-opacity="${hot?0.1:1}" stroke="var(--border-strong)" stroke-width="0.7"/><line x1="${x-RD}" y1="${y}" x2="${x+RD}" y2="${y}" stroke="var(--border)" stroke-width="0.7"/><line x1="${x}" y1="${y-RD}" x2="${x}" y2="${y+RD}" stroke="var(--border)" stroke-width="0.7"/>`;
+if(S.arcs&&S.arcs[k]&&abs(S.arcs[k])>1e-6){const o=S.arcs[k],ox=x+o[0]*sc,oy=y-o[1]*sc,rr=abs(o)*sc,ang=(k-1)*TAU/S.N;h+=`<path d="M${fm(ox)} ${fm(oy)}A${fm(rr)} ${fm(rr)} 0 ${ang>Math.PI?1:0} 0 ${fm(px)} ${fm(py)}" fill="none" stroke="${CORAL}" stroke-width="1" stroke-dasharray="3 3"/>`}
+h+=`<line x1="${x}" y1="${y}" x2="${fm(px)}" y2="${fm(py)}" stroke="${BLUE}" stroke-width="1.3"/><circle cx="${fm(px)}" cy="${fm(py)}" r="6" fill="${BLUE}" stroke="var(--surface-2)" stroke-width="1.5" style="cursor:grab"/><text x="${x}" y="${y+RD+13}" text-anchor="middle" dominant-baseline="central" style="font-size:12px;fill:var(--text-secondary)">k = ${k}</text><text x="${x}" y="${y+RD+30}" text-anchor="middle" dominant-baseline="central" style="font-size:12px;fill:var(--text-primary);font-variant-numeric:tabular-nums">${cfmt(z)}</text>`});
+const rows=Math.ceil((S.N-2)/3);$('disks').setAttribute('viewBox',`0 0 300 ${rows*ROWH+2}`);$('disks').innerHTML=h}
+function readouts(BLUE,CORAL){$('rz').textContent=znorm().toFixed(3);$('note').textContent=S.note;
+$('legend').innerHTML=`<span style="color:${BLUE}">Circles</span>: where each vertex can reach in a coordinate step of fixed size, the same at every vertex. <span style="color:${CORAL}">Chain</span>: how the selected vertex adds up from ω<sup>j</sup> and each mode. Dashed polygon: z = 0.`;
+document.querySelectorAll('#ns button').forEach(b=>b.classList.toggle('fp-on',+b.dataset.n===S.N))}
+function evt(svg,e){const r=svg.getBoundingClientRect(),vb=svg.viewBox.baseVal;return [(e.clientX-r.left)*vb.width/r.width,(e.clientY-r.top)*vb.height/r.height]}
+const poly=$('poly'),disks=$('disks');
+poly.addEventListener('pointerdown',e=>{const m=evt(poly,e),v=shape();let best=-1,bd=18;v.forEach((p,j)=>{const c=pt(p,S.fit),d=Math.hypot(c[0]-m[0],c[1]-m[1]);if(d<bd){bd=d;best=j}});if(best<0)return;S.sel=best;S.arcs=null;S.note='';S.raw=v.map(p=>p.slice());S.drag={t:'v',j:best};poly.setPointerCapture(e.pointerId);render()});
+poly.addEventListener('pointermove',e=>{if(!S.drag||S.drag.t!=='v')return;const m=evt(poly,e),f=S.fit,w=[f.cx+(m[0]-180)/f.s,f.cy-(m[1]-180)/f.s];S.raw[S.drag.j]=w;const z=fromV(S.raw);if(z){S.z=z}render()});
+const endV=()=>{if(S.drag&&S.drag.t==='v'){S.drag=null;S.raw=null;render()}};
+poly.addEventListener('pointerup',endV);poly.addEventListener('pointercancel',endV);
+function dhit(m){let hit=null;modes().forEach((k,i)=>{const [x,y]=dpos(i);if(Math.hypot(m[0]-x,m[1]-y)<=RD+6)hit=k});return hit}
+function setZ(k,m){const i=modes().indexOf(k),[x,y]=dpos(i),sc=RD/S.zr;let zx=(m[0]-x)/sc,zy=-(m[1]-y)/sc;const a=Math.hypot(zx,zy);if(a>S.zr){zx*=S.zr/a;zy*=S.zr/a}S.z[k]=[zx,zy]}
+disks.addEventListener('pointerdown',e=>{const m=evt(disks,e),k=dhit(m);if(k==null)return;S.drag={t:'z',k};S.hover=k;S.arcs=null;S.note='';disks.setPointerCapture(e.pointerId);setZ(k,m);render()});
+disks.addEventListener('pointermove',e=>{const m=evt(disks,e);if(S.drag&&S.drag.t==='z'){setZ(S.drag.k,m);render();return}const k=dhit(m);if(k!==S.hover){S.hover=k;render()}});
+const endZ=()=>{if(S.drag&&S.drag.t==='z'){S.drag=null;render()}};
+disks.addEventListener('pointerup',endZ);disks.addEventListener('pointercancel',endZ);
+disks.addEventListener('pointerleave',()=>{if(!S.drag&&S.hover!=null){S.hover=null;render()}});
+[3,4,5,6,7,8].forEach(n=>{const b=document.createElement('button');b.textContent=n;b.dataset.n=n;b.style.minWidth='34px';b.onclick=()=>{setN(n);render()};$('ns').appendChild(b)});
+$('reach').onchange=render;
+$('reg').onclick=()=>{setN(S.N);render()};
+$('rel').onclick=()=>{const z0=znorm();S.arcs={};for(const k of modes()){S.arcs[k]=S.z[k].slice();S.z[k]=mul(S.z[k],om(1,k-1))}S.sel=(S.sel+S.N-1)%S.N;S.note=`Same polygon, new labels (drawn turned by one step, since mode 1 is pinned to ω^j): each dial rotated by ω^(k−1), and ‖z‖ stays ${z0.toFixed(3)}.`;render()};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+setN(6);S.z[2]=[0.18,0.1];S.z[3]=[-0.1,0.14];S.z[5]=[0.12,-0.08];render();
+</script>
+</body>
+</html>
